@@ -1,0 +1,1 @@
+Create a new super simple chatbox in a style of slack, that I can use /s then the array of options that I can select the set of words, sentence will popup and when the user click on the option, the said text will appear in the chatbox ready to be sent.
