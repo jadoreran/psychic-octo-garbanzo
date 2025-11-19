@@ -9,6 +9,11 @@
           <div class="header-status">ลูกค้า - ออนไลน์</div>
         </div>
       </div>
+      <div v-if="activeTags.length > 0" class="tags-container">
+        <span v-for="tag in activeTags" :key="tag.id" class="tag" :style="{ background: tag.color }">
+          {{ tag.name }}
+        </span>
+      </div>
     </div>
 
     <div class="messages-container" ref="messagesContainer">
@@ -59,6 +64,23 @@
             <div v-if="item.price" class="item-price">{{ item.price }}</div>
           </div>
         </div>
+
+        <!-- Show tags if using /t command -->
+        <div v-if="inputText.startsWith('/t')" class="options-popup">
+          <div class="options-header">Tags ({{ availableTags.length }}) - Press T to toggle</div>
+          <div
+            v-for="(tag, index) in availableTags"
+            :key="'tag-' + tag.id"
+            :class="['option-item', 'tag-item', { 'highlighted': index === tagIndex, 'tag-selected': tag.selected }]"
+            @click="toggleTag(index)"
+            @mouseenter="tagIndex = index"
+          >
+            <div class="tag-item-content">
+              <span class="tag-preview" :style="{ background: tag.color }">{{ tag.name }}</span>
+              <span v-if="tag.selected" class="tag-check">✓</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="input-wrapper">
@@ -69,6 +91,7 @@
           @keydown.esc="closeOptions"
           @keydown.down.prevent="navigateOptions(1)"
           @keydown.up.prevent="navigateOptions(-1)"
+          @keydown="handleKeydown"
           type="text"
           placeholder="ส่งข้อความ..."
           class="message-input"
@@ -106,6 +129,19 @@ const contextualMode = ref(false)
 const contextualIndex = ref(0)
 const contextualTitle = ref('')
 const contextualSuggestions = ref([])
+const tagIndex = ref(0)
+const availableTags = ref([
+  { id: 1, name: 'VIP', color: 'linear-gradient(135deg, #ff0844 0%, #c0392b 100%)', selected: false },
+  { id: 2, name: 'New', color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', selected: false },
+  { id: 3, name: 'Urgent', color: 'linear-gradient(135deg, #fa8231 0%, #f54ea2 100%)', selected: false },
+  { id: 4, name: 'Follow-up', color: 'linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%)', selected: false },
+  { id: 5, name: 'Complaint', color: 'linear-gradient(135deg, #fd79a8 0%, #e84393 100%)', selected: false },
+  { id: 6, name: 'Regular', color: 'linear-gradient(135deg, #00b894 0%, #00cec9 100%)', selected: false },
+  { id: 7, name: 'Wholesale', color: 'linear-gradient(135deg, #fdcb6e 0%, #e17055 100%)', selected: false },
+  { id: 8, name: 'Repeat', color: 'linear-gradient(135deg, #55efc4 0%, #81ecec 100%)', selected: false }
+])
+const appliedTags = ref([])
+const activeTags = computed(() => appliedTags.value)
 
 // Define your quick reply options here
 const quickReplyOptions = ref([
@@ -238,10 +274,11 @@ const updateContextualSuggestions = () => {
 }
 
 const handleInput = () => {
-  // Check if user typed "/s", "/p", or a direct category command
-  if (inputText.value.startsWith('/s') || inputText.value.startsWith('/p')) {
+  // Check if user typed "/s", "/p", "/t", or a direct category command
+  if (inputText.value.startsWith('/s') || inputText.value.startsWith('/p') || inputText.value.startsWith('/t')) {
     showOptions.value = true
     selectedIndex.value = 0
+    tagIndex.value = 0
     updateContextualSuggestions()
   } else if (inputText.value.startsWith('/')) {
     // Check if it's a direct category command
@@ -287,6 +324,31 @@ const selectContextual = (item) => {
   })
 }
 
+const toggleTag = (index) => {
+  availableTags.value[index].selected = !availableTags.value[index].selected
+}
+
+const applyTags = () => {
+  // Save the selected tags to appliedTags
+  appliedTags.value = availableTags.value.filter(tag => tag.selected)
+
+  inputText.value = ''
+  showOptions.value = false
+  tagIndex.value = 0
+  // Focus back on input
+  nextTick(() => {
+    messageInput.value?.focus()
+  })
+}
+
+const handleKeydown = (event) => {
+  // Handle 't' key to toggle tags
+  if (event.key === 't' && inputText.value.startsWith('/t') && showOptions.value) {
+    event.preventDefault()
+    toggleTag(tagIndex.value)
+  }
+}
+
 const navigateOptions = (direction) => {
   if (!showOptions.value) return
 
@@ -297,6 +359,14 @@ const navigateOptions = (direction) => {
       contextualIndex.value = contextualSuggestions.value.length - 1
     } else if (contextualIndex.value >= contextualSuggestions.value.length) {
       contextualIndex.value = 0
+    }
+  } else if (inputText.value.startsWith('/t')) {
+    // Navigate tags
+    tagIndex.value += direction
+    if (tagIndex.value < 0) {
+      tagIndex.value = availableTags.value.length - 1
+    } else if (tagIndex.value >= availableTags.value.length) {
+      tagIndex.value = 0
     }
   } else {
     // Navigate quick replies for /s
@@ -311,8 +381,11 @@ const navigateOptions = (direction) => {
 
 const handleEnter = () => {
   if (showOptions.value) {
-    // If using /p, select from packages
-    if (inputText.value.startsWith('/p')) {
+    // If using /t, apply tags
+    if (inputText.value.startsWith('/t')) {
+      applyTags()
+    } else if (inputText.value.startsWith('/p')) {
+      // If using /p, select from packages
       selectContextual(contextualSuggestions.value[contextualIndex.value])
     } else if (filteredOptions.value.length > 0) {
       // Select highlighted quick reply
@@ -377,12 +450,31 @@ const sendMessage = () => {
   background: #252525;
   border-bottom: 1px solid #3a3a3a;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 18px;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-left: 40px;
+}
+
+.tag {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 
 .back-arrow {
@@ -550,7 +642,7 @@ const sendMessage = () => {
 .send-button {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FF385C 0%, #d81f43 100%);
   color: white;
   border: none;
   border-radius: 50%;
@@ -562,12 +654,12 @@ const sendMessage = () => {
   justify-content: center;
   transition: transform 0.2s, box-shadow 0.2s;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(255, 56, 92, 0.3);
 }
 
 .send-button:hover {
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 4px 12px rgba(255, 56, 92, 0.5);
 }
 
 .send-button:active {
@@ -661,6 +753,37 @@ const sendMessage = () => {
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid #404040;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+}
+
+.tag-item-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.tag-preview {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.tag-check {
+  color: #27ae60;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.tag-selected {
+  background: rgba(102, 126, 234, 0.15);
 }
 
 /* Scrollbar styling */
