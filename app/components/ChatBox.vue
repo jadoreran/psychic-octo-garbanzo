@@ -3,10 +3,10 @@
     <div class="chat-header">
       <div class="header-left">
         <span class="back-arrow">←</span>
-        <div class="header-avatar">A</div>
+        <div class="header-avatar">C</div>
         <div class="header-info">
-          <div class="header-name">Admin A</div>
-          <div class="header-status">ห้องแอดมินเบื้องต้น</div>
+          <div class="header-name">Customer</div>
+          <div class="header-status">ลูกค้า - ออนไลน์</div>
         </div>
       </div>
     </div>
@@ -25,20 +25,39 @@
 
     <div class="input-container">
       <!-- Quick Reply Options Popup -->
-      <div v-if="showOptions" class="options-popup">
-        <div class="options-header">/s - Quick Replies {{ filteredOptions.length > 0 ? `(${filteredOptions.length})` : '' }}</div>
-        <div v-if="filteredOptions.length === 0" class="no-results">
-          No matching options found
+      <div v-if="showOptions" class="options-popup-container">
+        <!-- Show quick replies if using /s command -->
+        <div v-if="inputText.startsWith('/s')" class="options-popup">
+          <div class="options-header">Quick Replies ({{ filteredOptions.length }})</div>
+          <div v-if="filteredOptions.length === 0" class="no-results">
+            No matching options found
+          </div>
+          <div
+            v-for="(option, index) in filteredOptions"
+            :key="index"
+            :class="['option-item', { 'highlighted': index === selectedIndex }]"
+            @click="selectOption(option)"
+            @mouseenter="selectedIndex = index"
+          >
+            <div class="option-title">{{ option.label }}</div>
+            <div class="option-preview">{{ option.text }}</div>
+          </div>
         </div>
-        <div
-          v-for="(option, index) in filteredOptions"
-          :key="index"
-          :class="['option-item', { 'highlighted': index === selectedIndex }]"
-          @click="selectOption(option)"
-          @mouseenter="selectedIndex = index"
-        >
-          <div class="option-title">{{ option.label }}</div>
-          <div class="option-preview">{{ option.text }}</div>
+
+        <!-- Show packages if using /p command -->
+        <div v-if="inputText.startsWith('/p')" class="options-popup">
+          <div class="options-header">{{ contextualTitle }} ({{ contextualSuggestions.length }})</div>
+          <div
+            v-for="(item, index) in contextualSuggestions"
+            :key="'pkg-' + index"
+            :class="['option-item', { 'highlighted': index === contextualIndex }]"
+            @click="selectContextual(item)"
+            @mouseenter="contextualIndex = index"
+          >
+            <div class="option-title">{{ item.name }}</div>
+            <div class="option-preview">{{ item.description }}</div>
+            <div v-if="item.price" class="item-price">{{ item.price }}</div>
+          </div>
         </div>
       </div>
 
@@ -67,42 +86,69 @@ import { ref, computed, nextTick, watch } from 'vue'
 
 const inputText = ref('')
 const showOptions = ref(false)
-const messages = ref([])
+const messages = ref([
+  {
+    user: 'Customer',
+    text: 'สวัสดีครับ ผมสนใจสินค้าอยากสอบถามข้อมูล',
+    time: '9:30 AM',
+    isUser: false
+  },
+  {
+    user: 'Customer',
+    text: 'มีสินค้าตัวนี้สีอื่นไหมครับ?',
+    time: '9:31 AM',
+    isUser: false
+  }
+])
 const messagesContainer = ref(null)
 const messageInput = ref(null)
 const selectedIndex = ref(0)
+const contextualMode = ref(false)
+const contextualIndex = ref(0)
+const contextualTitle = ref('')
+const contextualSuggestions = ref([])
 
 // Define your quick reply options here
 const quickReplyOptions = ref([
   {
-    label: 'Greeting',
-    text: 'Hello! How can I help you today?',
-    keywords: ['hello', 'hi', 'greeting', 'hey']
+    label: 'ทักทาย',
+    text: 'สวัสดีค่ะ ยินดีให้บริการค่ะ มีอะไรให้ช่วยไหมคะ',
+    keywords: ['สวัสดี', 'hello', 'hi', 'ทักทาย', 'sawas', 'sawasdee', 'sawasdika']
   },
   {
-    label: 'Thank You',
-    text: 'Thank you so much for your help!',
-    keywords: ['thank', 'thanks', 'appreciate']
+    label: 'ขอบคุณ',
+    text: 'ขอบคุณที่ติดต่อเรานะคะ ยินดีให้บริการค่ะ',
+    keywords: ['ขอบคุณ', 'thank', 'thanks', 'khob', 'khobkhun', 'ขอบ']
   },
   {
-    label: 'Meeting',
-    text: 'Let\'s schedule a meeting to discuss this further.',
-    keywords: ['meeting', 'schedule', 'discuss', 'call']
+    label: 'สินค้ามีพร้อมส่ง',
+    text: 'สินค้ามีพร้อมส่งค่ะ สั่งเลยได้เลยนะคะ',
+    keywords: ['พร้อมส่ง', 'มีสินค้า', 'stock', 'available', 'phrom', 'promson', 'พร้อม']
   },
   {
-    label: 'Follow Up',
-    text: 'I\'ll follow up on this and get back to you soon.',
-    keywords: ['follow', 'followup', 'later', 'back']
+    label: 'ราคา',
+    text: 'ราคาปกติ 590 บาท ตอนนี้ลดพิเศษเหลือ 399 บาทค่ะ',
+    keywords: ['ราคา', 'price', 'เท่าไหร่', 'raka', 'raka', 'thao', 'thaorai']
   },
   {
-    label: 'Approval',
-    text: 'Looks good to me! Approved ✓',
-    keywords: ['approve', 'good', 'ok', 'yes', 'lgtm']
+    label: 'จัดส่ง',
+    text: 'จัดส่งฟรีทั่วไทยค่ะ ได้ของภายใน 2-3 วันค่ะ',
+    keywords: ['จัดส่ง', 'ship', 'delivery', 'ส่ง', 'jad', 'jadsong', 'song']
   },
   {
-    label: 'Working On It',
-    text: 'I\'m working on this right now, will update you shortly.',
-    keywords: ['working', 'progress', 'update', 'wip']
+    label: 'สอบถามเพิ่มเติม',
+    text: 'มีอะไรอยากสอบถามเพิ่มเติมไหมคะ ยินดีตอบทุกคำถามนะคะ',
+    keywords: ['สอบถาม', 'ถาม', 'question', 'ask', 'sobtam', 'tam', 'tham']
+  },
+  {
+    label: 'รอสักครู่',
+    text: 'รอสักครู่นะคะ ดิฉันเช็คให้เลยค่ะ',
+    keywords: ['รอ', 'wait', 'เช็ค', 'check', 'ro', 'rosakru', 'check']
+  },
+  {
+    label: 'ยืนยันออเดอร์',
+    text: 'ยืนยันออเดอร์แล้วนะคะ จัดส่งให้โดยเร็วที่สุดเลยค่ะ',
+    keywords: ['ยืนยัน', 'confirm', 'order', 'สั่ง', 'yuen', 'yuenya', 'order', 'sang']
   }
 ])
 
@@ -126,16 +172,53 @@ const filteredOptions = computed(() => {
   })
 })
 
+// Product packages data
+const productPackages = [
+  {
+    name: 'แพ็คเกจ A',
+    description: 'สินค้า 1 ชิ้น',
+    price: '฿399'
+  },
+  {
+    name: 'แพ็คเกจ B',
+    description: 'สินค้า 3 ชิ้น (ลด 10%)',
+    price: '฿1,077'
+  },
+  {
+    name: 'แพ็คเกจ C',
+    description: 'สินค้า 5 ชิ้น (ลด 15%)',
+    price: '฿1,699'
+  }
+]
+
 // Reset selected index when filtered options change
 watch(filteredOptions, () => {
   selectedIndex.value = 0
+  contextualMode.value = false
+  updateContextualSuggestions()
 })
 
+// Update contextual suggestions based on search
+const updateContextualSuggestions = () => {
+  // Check if using /p command
+  if (inputText.value.startsWith('/p')) {
+    contextualTitle.value = 'แพ็คเกจสินค้า'
+    contextualSuggestions.value = productPackages
+    contextualIndex.value = 0
+    return
+  }
+
+  // For /s command, don't show contextual suggestions
+  contextualSuggestions.value = []
+  contextualIndex.value = 0
+}
+
 const handleInput = () => {
-  // Check if user typed "/s"
-  if (inputText.value.startsWith('/s')) {
+  // Check if user typed "/s" or "/p"
+  if (inputText.value.startsWith('/s') || inputText.value.startsWith('/p')) {
     showOptions.value = true
     selectedIndex.value = 0
+    updateContextualSuggestions()
   } else {
     showOptions.value = false
   }
@@ -145,6 +228,20 @@ const selectOption = (option) => {
   inputText.value = option.text
   showOptions.value = false
   selectedIndex.value = 0
+  contextualMode.value = false
+  contextualSuggestions.value = []
+  // Focus back on input
+  nextTick(() => {
+    messageInput.value?.focus()
+  })
+}
+
+const selectContextual = (item) => {
+  inputText.value = `${item.name} - ${item.description} ${item.price ? item.price : ''}`
+  showOptions.value = false
+  selectedIndex.value = 0
+  contextualMode.value = false
+  contextualSuggestions.value = []
   // Focus back on input
   nextTick(() => {
     messageInput.value?.focus()
@@ -152,22 +249,36 @@ const selectOption = (option) => {
 }
 
 const navigateOptions = (direction) => {
-  if (!showOptions.value || filteredOptions.value.length === 0) return
+  if (!showOptions.value) return
 
-  selectedIndex.value += direction
-
-  // Wrap around
-  if (selectedIndex.value < 0) {
-    selectedIndex.value = filteredOptions.value.length - 1
-  } else if (selectedIndex.value >= filteredOptions.value.length) {
-    selectedIndex.value = 0
+  // If using /p, navigate packages
+  if (inputText.value.startsWith('/p')) {
+    contextualIndex.value += direction
+    if (contextualIndex.value < 0) {
+      contextualIndex.value = contextualSuggestions.value.length - 1
+    } else if (contextualIndex.value >= contextualSuggestions.value.length) {
+      contextualIndex.value = 0
+    }
+  } else {
+    // Navigate quick replies for /s
+    selectedIndex.value += direction
+    if (selectedIndex.value < 0) {
+      selectedIndex.value = filteredOptions.value.length - 1
+    } else if (selectedIndex.value >= filteredOptions.value.length) {
+      selectedIndex.value = 0
+    }
   }
 }
 
 const handleEnter = () => {
-  if (showOptions.value && filteredOptions.value.length > 0) {
-    // Select the highlighted option
-    selectOption(filteredOptions.value[selectedIndex.value])
+  if (showOptions.value) {
+    // If using /p, select from packages
+    if (inputText.value.startsWith('/p')) {
+      selectContextual(contextualSuggestions.value[contextualIndex.value])
+    } else if (filteredOptions.value.length > 0) {
+      // Select highlighted quick reply
+      selectOption(filteredOptions.value[selectedIndex.value])
+    }
   } else {
     // Send the message
     sendMessage()
@@ -180,7 +291,7 @@ const closeOptions = () => {
 }
 
 const sendMessage = () => {
-  if (inputText.value.trim() && !inputText.value.startsWith('/s')) {
+  if (inputText.value.trim() && !inputText.value.startsWith('/s') && !inputText.value.startsWith('/p')) {
     const now = new Date()
     const timeString = now.toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -212,18 +323,21 @@ const sendMessage = () => {
 .chat-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
+  width: 100%;
   max-width: 600px;
   margin: 0 auto;
-  background: #f5f5f5;
+  background: #0f0f0f;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Noto Sans', 'Helvetica', sans-serif;
+  overflow: hidden;
+  position: relative;
 }
 
 .chat-header {
   padding: 12px 16px;
-  background: #fff;
-  border-bottom: 1px solid #e5e5e5;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  background: #1a1a1a;
+  border-bottom: 1px solid #2a2a2a;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .header-left {
@@ -234,8 +348,13 @@ const sendMessage = () => {
 
 .back-arrow {
   font-size: 24px;
-  color: #666;
+  color: #999;
   cursor: pointer;
+  transition: color 0.2s;
+}
+
+.back-arrow:hover {
+  color: #fff;
 }
 
 .header-avatar {
@@ -250,6 +369,7 @@ const sendMessage = () => {
   font-weight: 600;
   font-size: 16px;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .header-info {
@@ -259,19 +379,19 @@ const sendMessage = () => {
 .header-name {
   font-weight: 600;
   font-size: 15px;
-  color: #000;
+  color: #fff;
 }
 
 .header-status {
   font-size: 12px;
-  color: #666;
+  color: #888;
 }
 
 .messages-container {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  background: #f5f5f5;
+  background: #0f0f0f;
 }
 
 .message-wrapper {
@@ -297,36 +417,41 @@ const sendMessage = () => {
   font-weight: 600;
   font-size: 13px;
   flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
 }
 
 .user-avatar {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  box-shadow: 0 2px 6px rgba(240, 147, 251, 0.3);
 }
 
 .message-bubble {
   max-width: 70%;
   padding: 10px 14px;
   border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  background: #1e1e1e;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  border: 1px solid #2a2a2a;
 }
 
 .user-message .message-bubble {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  border: none;
+  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.4);
 }
 
 .message-sender {
   font-weight: 600;
   font-size: 12px;
-  color: #666;
+  color: #888;
   margin-bottom: 4px;
 }
 
 .message-text {
   font-size: 14px;
   line-height: 1.4;
-  color: #000;
+  color: #e0e0e0;
   word-wrap: break-word;
   margin-bottom: 4px;
 }
@@ -337,28 +462,35 @@ const sendMessage = () => {
 
 .message-time {
   font-size: 10px;
-  color: #999;
+  color: #666;
   text-align: right;
 }
 
 .user-message .message-time {
-  color: rgba(255,255,255,0.8);
+  color: rgba(255,255,255,0.7);
 }
 
 .input-container {
   position: relative;
   padding: 12px 16px;
-  background: #fff;
-  border-top: 1px solid #e5e5e5;
+  background: #1a1a1a;
+  border-top: 1px solid #2a2a2a;
 }
 
 .input-wrapper {
   display: flex;
   gap: 8px;
   align-items: center;
-  background: #f5f5f5;
+  background: #252525;
   border-radius: 24px;
   padding: 4px 8px;
+  border: 1px solid #333;
+  transition: border-color 0.2s;
+}
+
+.input-wrapper:focus-within {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
 .attach-button {
@@ -370,6 +502,12 @@ const sendMessage = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #888;
+  transition: color 0.2s;
+}
+
+.attach-button:hover {
+  color: #fff;
 }
 
 .message-input {
@@ -380,10 +518,11 @@ const sendMessage = () => {
   font-size: 14px;
   font-family: inherit;
   outline: none;
+  color: #fff;
 }
 
 .message-input::placeholder {
-  color: #999;
+  color: #666;
 }
 
 .send-button {
@@ -399,39 +538,49 @@ const sendMessage = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .send-button:hover {
   transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
 }
 
 .send-button:active {
   transform: scale(0.95);
 }
 
-.options-popup {
+.options-popup-container {
   position: absolute;
   bottom: 100%;
   left: 16px;
   right: 16px;
   margin-bottom: 8px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-  max-height: 400px;
-  overflow-y: auto;
+  display: flex;
+  gap: 8px;
   z-index: 100;
 }
+
+.options-popup {
+  flex: 1;
+  background: #1e1e1e;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #333;
+}
+
 
 .options-header {
   padding: 12px 16px;
   font-weight: 600;
   font-size: 13px;
-  color: #666;
-  border-bottom: 1px solid #e5e5e5;
-  background: #f9f9f9;
+  color: #999;
+  border-bottom: 1px solid #2a2a2a;
+  background: #252525;
   position: sticky;
   top: 0;
   border-radius: 12px 12px 0 0;
@@ -440,7 +589,7 @@ const sendMessage = () => {
 .option-item {
   padding: 12px 16px;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #2a2a2a;
   transition: background 0.2s, border-left 0.2s;
   border-left: 3px solid transparent;
 }
@@ -451,36 +600,45 @@ const sendMessage = () => {
 }
 
 .option-item:hover {
-  background: #f5f5f5;
+  background: #252525;
 }
 
 .option-item.highlighted {
-  background: linear-gradient(90deg, rgba(102, 126, 234, 0.1) 0%, rgba(245, 245, 245, 0.5) 100%);
+  background: linear-gradient(90deg, rgba(102, 126, 234, 0.2) 0%, rgba(30, 30, 30, 0.8) 100%);
   border-left-color: #667eea;
 }
 
 .option-item:active {
-  background: #ebebeb;
+  background: #2a2a2a;
 }
 
 .no-results {
   padding: 24px 16px;
   text-align: center;
-  color: #999;
+  color: #666;
   font-size: 13px;
 }
 
 .option-title {
   font-weight: 600;
   font-size: 13px;
-  color: #000;
+  color: #e0e0e0;
   margin-bottom: 4px;
 }
 
 .option-preview {
   font-size: 12px;
-  color: #666;
+  color: #888;
   line-height: 1.4;
+}
+
+.item-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: #667eea;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #2a2a2a;
 }
 
 /* Scrollbar styling */
@@ -496,12 +654,12 @@ const sendMessage = () => {
 
 .messages-container::-webkit-scrollbar-thumb,
 .options-popup::-webkit-scrollbar-thumb {
-  background: #ddd;
+  background: #333;
   border-radius: 3px;
 }
 
 .messages-container::-webkit-scrollbar-thumb:hover,
 .options-popup::-webkit-scrollbar-thumb:hover {
-  background: #bbb;
+  background: #444;
 }
 </style>
