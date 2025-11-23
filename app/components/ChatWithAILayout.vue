@@ -15,6 +15,7 @@
       :error="aiError"
       :current-suggestion="aiSuggestion"
       :suggestion-meta="aiMeta"
+      :mode="panelMode"
       @retry="retryAISuggestion"
       @send-message="sendMessage"
     />
@@ -36,10 +37,12 @@ const aiMeta = ref({
   reasoningTokens: 0,
   finishReason: ''
 })
+const panelMode = ref<'suggestion' | 'lead-analysis'>('suggestion')
 
 let lastMessages: any[] = []
 
 const handleAISuggestionRequest = async (messages: any[]) => {
+  panelMode.value = 'suggestion'
   isAILoading.value = true
   aiError.value = null
   lastMessages = messages
@@ -108,6 +111,7 @@ const sendMessage = (text: string) => {
 }
 
 const handleLeadAnalysisRequest = async (messages: any[]) => {
+  panelMode.value = 'lead-analysis'
   isAILoading.value = true
   aiError.value = null
   lastMessages = messages

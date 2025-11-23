@@ -46,8 +46,18 @@
         />
 
         <div class="suggestion-actions">
-          <button @click="handleSend" class="send-button">
-            ส่งข้อความ
+          <button
+            @click="handleSend"
+            class="send-button"
+            :class="{ 'following': isFollowing && props.mode === 'lead-analysis' }"
+            :disabled="isSavingLead"
+          >
+            <span v-if="isSavingLead" class="button-spinner">⟳</span>
+            <span v-else>
+              {{ props.mode === 'lead-analysis'
+                ? (isFollowing ? 'ยกเลิกการติดตาม' : 'ติดตามลีด')
+                : 'ส่งข้อความ' }}
+            </span>
           </button>
         </div>
 
@@ -86,26 +96,56 @@ const props = defineProps<{
   error: string | null
   currentSuggestion: string | null
   suggestionMeta: SuggestionMeta
+  mode?: 'suggestion' | 'lead-analysis'
 }>()
 
 const emit = defineEmits<{
   retry: []
   'send-message': [text: string]
+  'follow-lead': [leadData: string]
+  'unfollow-lead': []
 }>()
 
 const editableText = ref('')
+const isFollowing = ref(false)
+const isSavingLead = ref(false)
 
 // Watch for new AI suggestions and update editable text
 watch(() => props.currentSuggestion, (newSuggestion) => {
   if (newSuggestion) {
     editableText.value = newSuggestion
+    // Reset following state when new analysis comes in
+    if (props.mode === 'lead-analysis') {
+      isFollowing.value = false
+    }
   }
 }, { immediate: true })
 
-const handleSend = () => {
-  if (editableText.value.trim()) {
-    emit('send-message', editableText.value)
-    editableText.value = ''
+const handleSend = async () => {
+  if (props.mode === 'lead-analysis') {
+    // Handle lead follow/unfollow
+    isSavingLead.value = true
+
+    // Mock API call
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    if (isFollowing.value) {
+      // Unfollow lead
+      emit('unfollow-lead')
+      isFollowing.value = false
+    } else {
+      // Follow lead - save to backend
+      emit('follow-lead', editableText.value)
+      isFollowing.value = true
+    }
+
+    isSavingLead.value = false
+  } else {
+    // Handle regular message send
+    if (editableText.value.trim()) {
+      emit('send-message', editableText.value)
+      editableText.value = ''
+    }
   }
 }
 </script>
@@ -364,6 +404,25 @@ const handleSend = () => {
 
 .send-button:active {
   transform: translateY(0);
+}
+
+.send-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.send-button.following {
+  background: linear-gradient(135deg, #666 0%, #888 100%);
+}
+
+.send-button.following:hover {
+  box-shadow: 0 4px 12px rgba(102, 102, 102, 0.5);
+}
+
+.button-spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
 }
 
 .model-info {
