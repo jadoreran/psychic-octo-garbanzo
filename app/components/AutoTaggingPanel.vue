@@ -296,10 +296,10 @@ const handleConfirm = async () => {
 
 /* AI Suggestions */
 .suggestions-section {
-  background: #2a2a2a;
+  background: linear-gradient(135deg, rgba(253, 203, 110, 0.1) 0%, rgba(225, 112, 85, 0.1) 100%);
   border-radius: 12px;
   padding: 12px;
-  border: 1px solid #404040;
+  border: 1px solid rgba(253, 203, 110, 0.3);
 }
 
 .suggestions-list {
@@ -313,19 +313,20 @@ const handleConfirm = async () => {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: #1e1e1e;
+  background: rgba(253, 203, 110, 0.05);
   border-radius: 8px;
-  border: 1px solid #333;
+  border: 1px solid rgba(253, 203, 110, 0.2);
 }
 
 .suggestion-item span {
-  color: #e0e0e0;
+  color: #ffd89b;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .apply-btn {
   padding: 4px 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #fdcb6e 0%, #e17055 100%);
   color: white;
   border: none;
   border-radius: 6px;
@@ -333,10 +334,12 @@ const handleConfirm = async () => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(253, 203, 110, 0.3);
 }
 
 .apply-btn:hover {
   transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(253, 203, 110, 0.5);
 }
 
 /* Selected Tags */

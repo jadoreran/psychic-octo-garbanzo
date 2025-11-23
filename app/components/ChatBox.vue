@@ -234,12 +234,30 @@ const handleSendAIMessage = (event: CustomEvent) => {
   }
 }
 
+// Listen for mock conversation load
+const handleLoadMockConversation = (event: CustomEvent) => {
+  const mockMessages = event.detail
+  if (mockMessages && Array.isArray(mockMessages)) {
+    // Replace current messages with mock conversation
+    messages.value = [...mockMessages]
+
+    // Scroll to bottom
+    nextTick(() => {
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+      }
+    })
+  }
+}
+
 onMounted(() => {
   window.addEventListener('send-ai-message', handleSendAIMessage as EventListener)
+  window.addEventListener('load-mock-conversation', handleLoadMockConversation as EventListener)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('send-ai-message', handleSendAIMessage as EventListener)
+  window.removeEventListener('load-mock-conversation', handleLoadMockConversation as EventListener)
 })
 
 // Define your quick reply options here

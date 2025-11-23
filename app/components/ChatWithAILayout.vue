@@ -10,12 +10,18 @@
     <!-- Chat Section -->
     <div class="chat-section">
       <ChatBox
+        ref="chatBoxRef"
         @ai-suggestion-requested="handleAISuggestionRequest"
         @ai-response-received="handleAIResponse"
         @lead-analysis-requested="handleLeadAnalysisRequest"
         @auto-tag-requested="handleAutoTagRequest"
       />
     </div>
+
+    <!-- Mock Conversation Panel (Right, before AI Panel) -->
+    <MockConversationPanel
+      @load-conversation="handleLoadMockConversation"
+    />
 
     <!-- AI Panel Section (Right) -->
     <AISuggestionsPanel
@@ -35,6 +41,7 @@ import { ref } from 'vue'
 import ChatBox from './ChatBox.vue'
 import AISuggestionsPanel from './AISuggestionsPanel.vue'
 import AutoTaggingPanel from './AutoTaggingPanel.vue'
+import MockConversationPanel from './MockConversationPanel.vue'
 import { openAIService } from '~/services/openai.service'
 
 const isAILoading = ref(false)
@@ -51,6 +58,9 @@ const panelMode = ref<'suggestion' | 'lead-analysis'>('suggestion')
 // Auto Tagging State
 const isTagAnalyzing = ref(false)
 const suggestedTags = ref<string[]>([])
+
+// ChatBox ref for mock conversation loading
+const chatBoxRef = ref<InstanceType<typeof ChatBox> | null>(null)
 
 let lastMessages: any[] = []
 
@@ -255,6 +265,11 @@ const handleConfirmTags = (tags: any[]) => {
   console.log('Tags confirmed:', tags)
   // TODO: Send tags to backend
   // For now, just log them
+}
+
+const handleLoadMockConversation = (messages: any[]) => {
+  // Dispatch event to load messages into ChatBox
+  window.dispatchEvent(new CustomEvent('load-mock-conversation', { detail: messages }))
 }
 </script>
 
