@@ -102,6 +102,15 @@
           <span v-if="!isAnalyzingLead">🎯</span>
           <span v-else class="ai-loading">⟳</span>
         </button>
+        <button
+          @click="analyzeAutoTags"
+          class="auto-tag-button"
+          :disabled="isAnalyzingTags || messages.length === 0"
+          :title="isAnalyzingTags ? 'กำลังวิเคราะห์แท็ก...' : 'วิเคราะห์แท็กอัตโนมัติ'"
+        >
+          <span v-if="!isAnalyzingTags">🏷️</span>
+          <span v-else class="ai-loading">⟳</span>
+        </button>
         <input
           v-model="inputText"
           @input="handleInput"
@@ -137,6 +146,7 @@ const { isAIResponding, aiError } = useAIChat()
 const emit = defineEmits<{
   'ai-suggestion-requested': [messages: Message[]]
   'lead-analysis-requested': [messages: Message[]]
+  'auto-tag-requested': [messages: Message[]]
 }>()
 
 interface Message {
@@ -542,6 +552,22 @@ const analyzeLeadScore = async () => {
   // Emit event to parent layout component
   emit('lead-analysis-requested', messages.value)
 }
+
+// Auto Tagging
+const isAnalyzingTags = ref(false)
+
+const analyzeAutoTags = async () => {
+  if (messages.value.length === 0) return
+
+  isAnalyzingTags.value = true
+  // Emit event to parent layout component
+  emit('auto-tag-requested', messages.value)
+
+  // Reset after a delay to allow the panel to receive the data
+  setTimeout(() => {
+    isAnalyzingTags.value = false
+  }, 2000)
+}
 </script>
 
 <style scoped>
@@ -799,6 +825,39 @@ const analyzeLeadScore = async () => {
 }
 
 .lead-score-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auto-tag-button {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(118, 75, 162, 0.3);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.auto-tag-button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(118, 75, 162, 0.5);
+}
+
+.auto-tag-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.auto-tag-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

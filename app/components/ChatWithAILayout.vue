@@ -1,15 +1,23 @@
 <template>
   <div class="chat-ai-layout">
+    <!-- Auto Tagging Panel (Left) -->
+    <AutoTaggingPanel
+      :is-analyzing="isTagAnalyzing"
+      :suggested-tags="suggestedTags"
+      @confirm-tags="handleConfirmTags"
+    />
+
     <!-- Chat Section -->
     <div class="chat-section">
       <ChatBox
         @ai-suggestion-requested="handleAISuggestionRequest"
         @ai-response-received="handleAIResponse"
         @lead-analysis-requested="handleLeadAnalysisRequest"
+        @auto-tag-requested="handleAutoTagRequest"
       />
     </div>
 
-    <!-- AI Panel Section -->
+    <!-- AI Panel Section (Right) -->
     <AISuggestionsPanel
       :is-loading="isAILoading"
       :error="aiError"
@@ -26,6 +34,7 @@
 import { ref } from 'vue'
 import ChatBox from './ChatBox.vue'
 import AISuggestionsPanel from './AISuggestionsPanel.vue'
+import AutoTaggingPanel from './AutoTaggingPanel.vue'
 import { openAIService } from '~/services/openai.service'
 
 const isAILoading = ref(false)
@@ -38,6 +47,10 @@ const aiMeta = ref({
   finishReason: ''
 })
 const panelMode = ref<'suggestion' | 'lead-analysis'>('suggestion')
+
+// Auto Tagging State
+const isTagAnalyzing = ref(false)
+const suggestedTags = ref<string[]>([])
 
 let lastMessages: any[] = []
 
@@ -177,6 +190,72 @@ Provide your response in Thai with this EXACT format:
     isAILoading.value = false
   }
 }
+
+const handleAutoTagRequest = async (messages: any[]) => {
+  isTagAnalyzing.value = true
+  suggestedTags.value = []
+
+  try {
+    // Prepare messages for tag analysis
+    const systemPrompt = `You are a tag classification AI for a Thai e-commerce customer service system.
+
+Analyze the conversation and suggest ALL relevant tags that apply from this list:
+- VIP
+- Urgent
+- New Customer
+- Complaint
+- Follow-up
+- Wholesale
+- Pre-order
+- Return
+- High Value
+- Support
+
+You can suggest multiple tags if they fit the conversation.
+Respond with ONLY a comma-separated list of suggested tags (no explanations).
+
+Examples:
+- Simple inquiry: "New Customer, Support"
+- Urgent VIP customer: "VIP, Urgent, High Value"
+- Return request: "Return, Follow-up"
+- Wholesale inquiry: "Wholesale, New Customer, High Value"`
+
+    const chatMessages = [
+      {
+        role: 'system' as const,
+        content: systemPrompt
+      },
+      {
+        role: 'user' as const,
+        content: `วิเคราะห์บทสนทนาต่อไปนี้:\n\n${messages.map(msg =>
+          `${msg.isUser ? 'พนักงาน' : 'ลูกค้า'}: ${msg.text}`
+        ).join('\n')}`
+      }
+    ]
+
+    // Call OpenAI API for tag analysis
+    const response = await openAIService.sendChatCompletion(chatMessages, {
+      temperature: 0.7,
+      max_tokens: 500  // Increased for GPT-5: reasoning tokens + visible output
+    })
+
+    // Extract tags from response
+    const content = response.choices[0]?.message?.content || ''
+    const tags = content.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+    suggestedTags.value = tags
+  } catch (error: any) {
+    console.error('Tag analysis error:', error)
+    suggestedTags.value = []
+  } finally {
+    isTagAnalyzing.value = false
+  }
+}
+
+const handleConfirmTags = (tags: any[]) => {
+  console.log('Tags confirmed:', tags)
+  // TODO: Send tags to backend
+  // For now, just log them
+}
 </script>
 
 <style scoped>
@@ -186,6 +265,7 @@ Provide your response in Thai with this EXACT format:
   width: 100%;
   background: #0f0f0f;
   overflow: hidden;
+  position: relative;
 }
 
 .chat-section {
@@ -194,6 +274,8 @@ Provide your response in Thai with this EXACT format:
   display: flex;
   justify-content: center;
   background: #0f0f0f;
+  margin-left: 320px; /* Width of left panel */
+  margin-right: 400px; /* Width of right panel */
 }
 
 /* Responsive */
