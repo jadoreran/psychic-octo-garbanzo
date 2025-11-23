@@ -5,18 +5,9 @@
         <span class="mock-icon">💬</span>
         <span>Mock Conversation</span>
       </div>
-      <div class="header-actions">
-        <label class="auto-sync-toggle" title="Auto-sync to chat">
-          <input type="checkbox" v-model="autoSync" />
-          <span class="toggle-label">Auto</span>
-        </label>
-        <button @click="togglePanel" class="toggle-button" title="Toggle Panel">
-          {{ isExpanded ? '→' : '←' }}
-        </button>
-      </div>
     </div>
 
-    <div v-if="isExpanded" class="mock-panel-content">
+    <div class="mock-panel-content">
       <!-- Instructions -->
       <div class="instructions">
         <p>Enter conversation in Q&A format:</p>
@@ -35,17 +26,10 @@
         <button
           @click="loadMockConversation"
           class="load-button"
-          :disabled="isLoading || !mockInput.trim() || autoSync"
-        >
-          <span v-if="isLoading" class="button-spinner">⟳</span>
-          <span v-else>{{ autoSync ? 'Auto-syncing...' : 'โหลดบทสนทนา' }}</span>
-        </button>
-        <button
-          @click="clearMock"
-          class="clear-button"
           :disabled="isLoading || !mockInput.trim()"
         >
-          ล้าง
+          <span v-if="isLoading" class="button-spinner">⟳</span>
+          <span v-else>โหลดบทสนทนา</span>
         </button>
       </div>
 
@@ -61,22 +45,6 @@
           >
             {{ template.name }}
           </button>
-        </div>
-      </div>
-
-      <!-- Preview -->
-      <div v-if="parsedMessages.length > 0" class="preview-section">
-        <div class="section-title">Preview ({{ parsedMessages.length }} messages)</div>
-        <div class="preview-list">
-          <div
-            v-for="(msg, index) in parsedMessages"
-            :key="index"
-            class="preview-message"
-            :class="{ 'is-customer': !msg.isUser }"
-          >
-            <span class="preview-label">{{ msg.isUser ? 'Agent' : 'Customer' }}:</span>
-            <span class="preview-text">{{ msg.text }}</span>
-          </div>
         </div>
       </div>
     </div>
@@ -97,10 +65,8 @@ const emit = defineEmits<{
   'load-conversation': [messages: Message[]]
 }>()
 
-const isExpanded = ref(true)
 const isLoading = ref(false)
 const mockInput = ref('')
-const autoSync = ref(true) // Auto-sync toggle
 
 const templates = ref([
   {
@@ -177,10 +143,6 @@ const parsedMessages = computed(() => {
   return messages
 })
 
-const togglePanel = () => {
-  isExpanded.value = !isExpanded.value
-}
-
 const loadMockConversation = async () => {
   if (parsedMessages.value.length === 0) return
 
@@ -193,17 +155,13 @@ const loadMockConversation = async () => {
   isLoading.value = false
 }
 
-const clearMock = () => {
-  mockInput.value = ''
-}
-
 const loadTemplate = (template: typeof templates.value[0]) => {
   mockInput.value = template.content
 }
 
 // Auto-sync: Watch mockInput and auto-load when it changes
 watch(mockInput, () => {
-  if (autoSync.value && parsedMessages.value.length > 0) {
+  if (parsedMessages.value.length > 0) {
     emit('load-conversation', parsedMessages.value)
   }
 }, { debounce: 500 }) // Debounce to avoid too many updates while typing

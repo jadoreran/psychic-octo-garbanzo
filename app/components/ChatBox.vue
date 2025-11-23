@@ -117,7 +117,7 @@
           :class="{ 'active': autoCorrectEnabled }"
           :title="autoCorrectEnabled ? 'ปิดการแก้ไขตัวสะกดอัตโนมัติ' : 'เปิดการแก้ไขตัวสะกดอัตโนมัติ'"
         >
-          <span>✓</span>
+          <span>🤖</span>
         </button>
         <input
           v-model="inputText"
@@ -131,8 +131,12 @@
           placeholder="ส่งข้อความ..."
           class="message-input"
           ref="messageInput"
+          :disabled="isAutoCorrecting"
         />
-        <button @click="sendMessage" class="send-button">→</button>
+        <button @click="sendMessage" class="send-button" :disabled="isAutoCorrecting">
+          <span v-if="!isAutoCorrecting">→</span>
+          <span v-else class="ai-loading">⟳</span>
+        </button>
       </div>
 
       <!-- AI Error Message -->
@@ -211,6 +215,7 @@ const activeTags = computed(() => appliedTags.value)
 
 // Auto-correct toggle
 const autoCorrectEnabled = ref(false)
+const isAutoCorrecting = ref(false)
 
 // Listen for AI panel "Send Message" clicks
 const handleSendAIMessage = (event: CustomEvent) => {
@@ -529,7 +534,7 @@ const toggleAutoCorrect = () => {
 }
 
 const sendMessage = async () => {
-  if (inputText.value.trim() && !inputText.value.startsWith('/')) {
+  if (inputText.value.trim() && !inputText.value.startsWith('/') && !isAutoCorrecting.value) {
     const now = new Date()
     const timeString = now.toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -541,6 +546,7 @@ const sendMessage = async () => {
 
     // Auto-correct if enabled
     if (autoCorrectEnabled.value) {
+      isAutoCorrecting.value = true
       try {
         const correctedText = await openAIService.sendChatCompletion([
           {
@@ -562,6 +568,8 @@ const sendMessage = async () => {
       } catch (error) {
         console.error('Auto-correct error:', error)
         // Continue with original text if correction fails
+      } finally {
+        isAutoCorrecting.value = false
       }
     }
 
@@ -1010,13 +1018,18 @@ const analyzeAutoTags = async () => {
   -webkit-tap-highlight-color: transparent;
 }
 
-.send-button:hover {
+.send-button:hover:not(:disabled) {
   transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(255, 56, 92, 0.5);
 }
 
-.send-button:active {
+.send-button:active:not(:disabled) {
   transform: scale(0.95);
+}
+
+.send-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .options-popup-container {
