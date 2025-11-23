@@ -118,11 +118,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useAIChat } from '~/composables/useAIChat'
 
 // AI Integration
-const { isAIResponding, aiError, generateSuggestion } = useAIChat()
+const { isAIResponding, aiError } = useAIChat()
+
+// Emit event to parent layout
+const emit = defineEmits<{
+  'ai-suggestion-requested': [messages: Message[]]
+}>()
 
 interface Message {
   user: string
@@ -187,6 +192,35 @@ const availableTags = ref<Tag[]>([
 ])
 const appliedTags = ref<Tag[]>([])
 const activeTags = computed(() => appliedTags.value)
+
+// Listen for AI panel "Send Message" clicks
+const handleSendAIMessage = (event: CustomEvent) => {
+  const text = event.detail
+  if (text && text.trim()) {
+    // Add the AI-generated message as a user message
+    messages.value.push({
+      user: 'Agent',
+      text: text.trim(),
+      time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+      isUser: true
+    })
+
+    // Scroll to bottom
+    nextTick(() => {
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+      }
+    })
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('send-ai-message', handleSendAIMessage as EventListener)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('send-ai-message', handleSendAIMessage as EventListener)
+})
 
 // Define your quick reply options here
 const quickReplyOptions = ref<QuickReply[]>([
@@ -485,22 +519,8 @@ const sendMessage = () => {
 const getAISuggestion = async () => {
   if (messages.value.length === 0) return
 
-  try {
-    const suggestion = await generateSuggestion(
-      messages.value[messages.value.length - 1].text,
-      messages.value
-    )
-
-    // Set the suggestion as input text
-    inputText.value = suggestion
-
-    // Focus back on input
-    nextTick(() => {
-      messageInput.value?.focus()
-    })
-  } catch (error) {
-    console.error('Failed to get AI suggestion:', error)
-  }
+  // Emit event to parent layout component
+  emit('ai-suggestion-requested', messages.value)
 }
 </script>
 
