@@ -5,9 +5,15 @@
         <span class="mock-icon">💬</span>
         <span>Mock Conversation</span>
       </div>
-      <button @click="togglePanel" class="toggle-button" title="Toggle Panel">
-        {{ isExpanded ? '→' : '←' }}
-      </button>
+      <div class="header-actions">
+        <label class="auto-sync-toggle" title="Auto-sync to chat">
+          <input type="checkbox" v-model="autoSync" />
+          <span class="toggle-label">Auto</span>
+        </label>
+        <button @click="togglePanel" class="toggle-button" title="Toggle Panel">
+          {{ isExpanded ? '→' : '←' }}
+        </button>
+      </div>
     </div>
 
     <div v-if="isExpanded" class="mock-panel-content">
@@ -29,10 +35,10 @@
         <button
           @click="loadMockConversation"
           class="load-button"
-          :disabled="isLoading || !mockInput.trim()"
+          :disabled="isLoading || !mockInput.trim() || autoSync"
         >
           <span v-if="isLoading" class="button-spinner">⟳</span>
-          <span v-else>โหลดบทสนทนา</span>
+          <span v-else>{{ autoSync ? 'Auto-syncing...' : 'โหลดบทสนทนา' }}</span>
         </button>
         <button
           @click="clearMock"
@@ -78,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 interface Message {
   user: string
@@ -94,6 +100,7 @@ const emit = defineEmits<{
 const isExpanded = ref(true)
 const isLoading = ref(false)
 const mockInput = ref('')
+const autoSync = ref(true) // Auto-sync toggle
 
 const templates = ref([
   {
@@ -193,6 +200,13 @@ const clearMock = () => {
 const loadTemplate = (template: typeof templates.value[0]) => {
   mockInput.value = template.content
 }
+
+// Auto-sync: Watch mockInput and auto-load when it changes
+watch(mockInput, () => {
+  if (autoSync.value && parsedMessages.value.length > 0) {
+    emit('load-conversation', parsedMessages.value)
+  }
+}, { debounce: 500 }) // Debounce to avoid too many updates while typing
 </script>
 
 <style scoped>
@@ -246,6 +260,42 @@ const loadTemplate = (template: typeof templates.value[0]) => {
 
 .mock-icon {
   font-size: 20px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-sync-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  background: rgba(79, 172, 254, 0.1);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.auto-sync-toggle:hover {
+  background: rgba(79, 172, 254, 0.2);
+}
+
+.auto-sync-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #4facfe;
+}
+
+.toggle-label {
+  font-size: 11px;
+  color: #4facfe;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .toggle-button {

@@ -111,6 +111,14 @@
           <span v-if="!isAnalyzingTags">🏷️</span>
           <span v-else class="ai-loading">⟳</span>
         </button>
+        <button
+          @click="toggleAutoCorrect"
+          class="auto-correct-button"
+          :class="{ 'active': autoCorrectEnabled }"
+          :title="autoCorrectEnabled ? 'ปิดการแก้ไขตัวสะกดอัตโนมัติ' : 'เปิดการแก้ไขตัวสะกดอัตโนมัติ'"
+        >
+          <span>✓</span>
+        </button>
         <input
           v-model="inputText"
           @input="handleInput"
@@ -138,6 +146,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useAIChat } from '~/composables/useAIChat'
+import { openAIService } from '~/services/openai.service'
 
 // AI Integration
 const { isAIResponding, aiError } = useAIChat()
@@ -178,20 +187,7 @@ interface Tag {
 
 const inputText = ref('')
 const showOptions = ref(false)
-const messages = ref<Message[]>([
-  {
-    user: 'J',
-    text: 'สวัสดีครับ ผมสนใจสินค้าอยากสอบถามข้อมูล',
-    time: '9:30 AM',
-    isUser: false
-  },
-  {
-    user: 'J',
-    text: 'มีสินค้าตัวนี้สีอื่นไหมครับ?',
-    time: '9:31 AM',
-    isUser: false
-  }
-])
+const messages = ref<Message[]>([])
 const messagesContainer = ref<HTMLDivElement | null>(null)
 const messageInput = ref<HTMLInputElement | null>(null)
 const selectedIndex = ref(0)
@@ -212,6 +208,9 @@ const availableTags = ref<Tag[]>([
 ])
 const appliedTags = ref<Tag[]>([])
 const activeTags = computed(() => appliedTags.value)
+
+// Auto-correct toggle
+const autoCorrectEnabled = ref(false)
 
 // Listen for AI panel "Send Message" clicks
 const handleSendAIMessage = (event: CustomEvent) => {
@@ -525,7 +524,11 @@ const closeOptions = () => {
   selectedIndex.value = 0
 }
 
-const sendMessage = () => {
+const toggleAutoCorrect = () => {
+  autoCorrectEnabled.value = !autoCorrectEnabled.value
+}
+
+const sendMessage = async () => {
   if (inputText.value.trim() && !inputText.value.startsWith('/')) {
     const now = new Date()
     const timeString = now.toLocaleTimeString('en-US', {
@@ -534,9 +537,37 @@ const sendMessage = () => {
       hour12: true
     })
 
+    let messageText = inputText.value
+
+    // Auto-correct if enabled
+    if (autoCorrectEnabled.value) {
+      try {
+        const correctedText = await openAIService.sendChatCompletion([
+          {
+            role: 'system',
+            content: 'You are a Thai language typo correction assistant. Fix any spelling mistakes, typos, or grammar errors in the user\'s message. Return ONLY the corrected text, nothing else. Keep the same tone and meaning. If the text is already correct, return it unchanged.'
+          },
+          {
+            role: 'user',
+            content: messageText
+          }
+        ], {
+          max_tokens: 500  // Increased for GPT-5: reasoning tokens + visible output
+        })
+
+        const corrected = correctedText.choices[0]?.message?.content?.trim()
+        if (corrected) {
+          messageText = corrected
+        }
+      } catch (error) {
+        console.error('Auto-correct error:', error)
+        // Continue with original text if correction fails
+      }
+    }
+
     messages.value.push({
       user: 'D',
-      text: inputText.value,
+      text: messageText,
       time: timeString,
       isUser: true
     })
@@ -878,6 +909,45 @@ const analyzeAutoTags = async () => {
 .auto-tag-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.auto-correct-button {
+  width: 36px;
+  height: 36px;
+  background: #333;
+  color: #999;
+  border: 2px solid #555;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.auto-correct-button:hover {
+  background: #3a3a3a;
+  border-color: #666;
+  transform: scale(1.05);
+}
+
+.auto-correct-button:active {
+  transform: scale(0.95);
+}
+
+.auto-correct-button.active {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+  border-color: #11998e;
+  box-shadow: 0 2px 6px rgba(56, 239, 125, 0.3);
+}
+
+.auto-correct-button.active:hover {
+  box-shadow: 0 4px 12px rgba(56, 239, 125, 0.5);
 }
 
 .ai-loading {
