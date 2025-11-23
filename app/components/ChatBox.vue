@@ -84,6 +84,15 @@
       </div>
 
       <div class="input-wrapper">
+        <button
+          @click="getAISuggestion"
+          class="ai-button"
+          :disabled="isAIResponding || messages.length === 0"
+          :title="isAIResponding ? 'AI กำลังคิด...' : 'ขอคำแนะนำจาก AI'"
+        >
+          <span v-if="!isAIResponding">✨</span>
+          <span v-else class="ai-loading">⟳</span>
+        </button>
         <input
           v-model="inputText"
           @input="handleInput"
@@ -99,16 +108,52 @@
         />
         <button @click="sendMessage" class="send-button">→</button>
       </div>
+
+      <!-- AI Error Message -->
+      <div v-if="aiError" class="ai-error">
+        {{ aiError }}
+      </div>
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
+import { useAIChat } from '~/composables/useAIChat'
+
+// AI Integration
+const { isAIResponding, aiError, generateSuggestion } = useAIChat()
+
+interface Message {
+  user: string
+  text: string
+  time: string
+  isUser: boolean
+}
+
+interface QuickReply {
+  label: string
+  category: string
+  text: string
+  keywords: string[]
+}
+
+interface ProductPackage {
+  name: string
+  description: string
+  price: string
+}
+
+interface Tag {
+  id: number
+  name: string
+  color: string
+  selected: boolean
+}
 
 const inputText = ref('')
 const showOptions = ref(false)
-const messages = ref([
+const messages = ref<Message[]>([
   {
     user: 'J',
     text: 'สวัสดีครับ ผมสนใจสินค้าอยากสอบถามข้อมูล',
@@ -122,15 +167,15 @@ const messages = ref([
     isUser: false
   }
 ])
-const messagesContainer = ref(null)
-const messageInput = ref(null)
+const messagesContainer = ref<HTMLDivElement | null>(null)
+const messageInput = ref<HTMLInputElement | null>(null)
 const selectedIndex = ref(0)
 const contextualMode = ref(false)
 const contextualIndex = ref(0)
 const contextualTitle = ref('')
-const contextualSuggestions = ref([])
+const contextualSuggestions = ref<ProductPackage[]>([])
 const tagIndex = ref(0)
-const availableTags = ref([
+const availableTags = ref<Tag[]>([
   { id: 1, name: 'VIP', color: 'linear-gradient(135deg, #ff0844 0%, #c0392b 100%)', selected: false },
   { id: 2, name: 'New', color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', selected: false },
   { id: 3, name: 'Urgent', color: 'linear-gradient(135deg, #fa8231 0%, #f54ea2 100%)', selected: false },
@@ -140,11 +185,11 @@ const availableTags = ref([
   { id: 7, name: 'Wholesale', color: 'linear-gradient(135deg, #fdcb6e 0%, #e17055 100%)', selected: false },
   { id: 8, name: 'Repeat', color: 'linear-gradient(135deg, #55efc4 0%, #81ecec 100%)', selected: false }
 ])
-const appliedTags = ref([])
+const appliedTags = ref<Tag[]>([])
 const activeTags = computed(() => appliedTags.value)
 
 // Define your quick reply options here
-const quickReplyOptions = ref([
+const quickReplyOptions = ref<QuickReply[]>([
   {
     label: 'ทักทาย',
     category: 'greeting',
@@ -300,7 +345,7 @@ const handleInput = () => {
   }
 }
 
-const selectOption = (option) => {
+const selectOption = (option: QuickReply) => {
   inputText.value = option.text
   showOptions.value = false
   selectedIndex.value = 0
@@ -312,7 +357,7 @@ const selectOption = (option) => {
   })
 }
 
-const selectContextual = (item) => {
+const selectContextual = (item: ProductPackage) => {
   inputText.value = `${item.name} - ${item.description} ${item.price ? item.price : ''}`
   showOptions.value = false
   selectedIndex.value = 0
@@ -324,7 +369,7 @@ const selectContextual = (item) => {
   })
 }
 
-const toggleTag = (index) => {
+const toggleTag = (index: number) => {
   availableTags.value[index].selected = !availableTags.value[index].selected
 }
 
@@ -341,7 +386,7 @@ const applyTags = () => {
   })
 }
 
-const handleKeydown = (event) => {
+const handleKeydown = (event: KeyboardEvent) => {
   // Handle 't' key to toggle tags
   if (event.key === 't' && inputText.value.startsWith('/t') && showOptions.value) {
     event.preventDefault()
@@ -349,7 +394,7 @@ const handleKeydown = (event) => {
   }
 }
 
-const navigateOptions = (direction) => {
+const navigateOptions = (direction: number) => {
   if (!showOptions.value) return
 
   // If using /p, navigate packages
@@ -386,10 +431,16 @@ const handleEnter = () => {
       applyTags()
     } else if (inputText.value.startsWith('/p')) {
       // If using /p, select from packages
-      selectContextual(contextualSuggestions.value[contextualIndex.value])
+      const selectedPackage = contextualSuggestions.value[contextualIndex.value]
+      if (selectedPackage) {
+        selectContextual(selectedPackage)
+      }
     } else if (filteredOptions.value.length > 0) {
       // Select highlighted quick reply
-      selectOption(filteredOptions.value[selectedIndex.value])
+      const selectedOption = filteredOptions.value[selectedIndex.value]
+      if (selectedOption) {
+        selectOption(selectedOption)
+      }
     }
   } else {
     // Send the message
@@ -427,6 +478,28 @@ const sendMessage = () => {
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
       }
     })
+  }
+}
+
+// AI Suggestion Function
+const getAISuggestion = async () => {
+  if (messages.value.length === 0) return
+
+  try {
+    const suggestion = await generateSuggestion(
+      messages.value[messages.value.length - 1].text,
+      messages.value
+    )
+
+    // Set the suggestion as input text
+    inputText.value = suggestion
+
+    // Focus back on input
+    nextTick(() => {
+      messageInput.value?.focus()
+    })
+  } catch (error) {
+    console.error('Failed to get AI suggestion:', error)
   }
 }
 </script>
@@ -622,6 +695,64 @@ const sendMessage = () => {
 .input-wrapper:focus-within {
   border-color: #667eea;
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.ai-button {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ai-button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
+.ai-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.ai-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-loading {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ai-error {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 56, 92, 0.1);
+  border: 1px solid rgba(255, 56, 92, 0.3);
+  border-radius: 8px;
+  color: #ff385c;
+  font-size: 12px;
+  text-align: center;
 }
 
 .message-input {

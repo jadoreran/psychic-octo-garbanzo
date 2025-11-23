@@ -4,7 +4,11 @@
       "Bash(README.md)",
       "Bash(mkdir:*)",
       "Bash(npm install)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(npm install:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
