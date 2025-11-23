@@ -93,6 +93,15 @@
           <span v-if="!isAIResponding">✨</span>
           <span v-else class="ai-loading">⟳</span>
         </button>
+        <button
+          @click="analyzeLeadScore"
+          class="lead-score-button"
+          :disabled="isAnalyzingLead || messages.length === 0"
+          :title="isAnalyzingLead ? 'กำลังวิเคราะห์...' : 'วิเคราะห์โอกาสขาย'"
+        >
+          <span v-if="!isAnalyzingLead">🎯</span>
+          <span v-else class="ai-loading">⟳</span>
+        </button>
         <input
           v-model="inputText"
           @input="handleInput"
@@ -127,6 +136,7 @@ const { isAIResponding, aiError } = useAIChat()
 // Emit event to parent layout
 const emit = defineEmits<{
   'ai-suggestion-requested': [messages: Message[]]
+  'lead-analysis-requested': [messages: Message[]]
 }>()
 
 interface Message {
@@ -522,6 +532,16 @@ const getAISuggestion = async () => {
   // Emit event to parent layout component
   emit('ai-suggestion-requested', messages.value)
 }
+
+// Lead Analysis
+const isAnalyzingLead = ref(false)
+
+const analyzeLeadScore = async () => {
+  if (messages.value.length === 0) return
+
+  // Emit event to parent layout component
+  emit('lead-analysis-requested', messages.value)
+}
 </script>
 
 <style scoped>
@@ -746,6 +766,39 @@ const getAISuggestion = async () => {
 }
 
 .ai-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lead-score-button {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(245, 87, 108, 0.3);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lead-score-button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(245, 87, 108, 0.5);
+}
+
+.lead-score-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.lead-score-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

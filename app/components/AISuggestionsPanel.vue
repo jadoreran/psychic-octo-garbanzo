@@ -43,7 +43,6 @@
           v-model="editableText"
           class="suggestion-textarea"
           placeholder="AI suggestion will appear here..."
-          rows="8"
         />
 
         <div class="suggestion-actions">
@@ -282,6 +281,9 @@ const handleSend = () => {
   border-radius: 12px;
   padding: 16px;
   border: 1px solid #404040;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .suggestion-header {
@@ -325,7 +327,8 @@ const handleSend = () => {
   margin-bottom: 16px;
   font-family: inherit;
   resize: vertical;
-  min-height: 120px;
+  flex: 1;
+  min-height: 300px;
 }
 
 .suggestion-textarea:focus {

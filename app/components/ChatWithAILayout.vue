@@ -5,6 +5,7 @@
       <ChatBox
         @ai-suggestion-requested="handleAISuggestionRequest"
         @ai-response-received="handleAIResponse"
+        @lead-analysis-requested="handleLeadAnalysisRequest"
       />
     </div>
 
@@ -104,6 +105,73 @@ const retryAISuggestion = () => {
 const sendMessage = (text: string) => {
   // Send the message directly to the chat
   window.dispatchEvent(new CustomEvent('send-ai-message', { detail: text }))
+}
+
+const handleLeadAnalysisRequest = async (messages: any[]) => {
+  isAILoading.value = true
+  aiError.value = null
+  lastMessages = messages
+
+  try {
+    // Prepare messages for lead scoring analysis
+    const systemPrompt = `You are a lead scoring AI for a Thai e-commerce customer service system.
+
+Analyze the conversation and provide a lead score from 0-100 based on:
+- Purchase intent (asking about products, prices, availability)
+- Budget signals (mentioning specific prices, asking for bulk discounts)
+- Urgency (time-sensitive language, immediate needs)
+- Engagement level (number of questions, detail in responses)
+- Decision-making authority (personal pronouns, decision language)
+
+Provide your response in Thai with this EXACT format:
+
+คะแนน: [score]/100
+ระดับ: [Hot/Warm/Cold]
+
+เหตุผล:
+- [reason 1]
+- [reason 2]
+- [reason 3]
+
+คำแนะนำ:
+[brief recommendation for sales team]`
+
+    const chatMessages = [
+      {
+        role: 'system' as const,
+        content: systemPrompt
+      },
+      {
+        role: 'user' as const,
+        content: `วิเคราะห์บทสนทนาต่อไปนี้:\n\n${messages.map(msg =>
+          `${msg.isUser ? 'พนักงาน' : 'ลูกค้า'}: ${msg.text}`
+        ).join('\n')}`
+      }
+    ]
+
+    // Call OpenAI API for lead analysis
+    const response = await openAIService.sendChatCompletion(chatMessages, {
+      temperature: 0.7,
+      max_tokens: 800
+    })
+
+    // Extract analysis and metadata
+    aiSuggestion.value = response.choices[0]?.message?.content || ''
+    aiMeta.value = {
+      model: response.model,
+      totalTokens: response.usage?.total_tokens || 0,
+      reasoningTokens: response.usage?.completion_tokens_details?.reasoning_tokens || 0,
+      finishReason: response.choices[0]?.finish_reason || ''
+    }
+
+    aiError.value = null
+  } catch (error: any) {
+    console.error('Lead analysis error:', error)
+    aiError.value = error.message || 'Failed to analyze lead score'
+    aiSuggestion.value = null
+  } finally {
+    isAILoading.value = false
+  }
 }
 </script>
 
